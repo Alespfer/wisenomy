@@ -7,9 +7,11 @@ Aplicación web en PHP, autoalojable y sin dependencias, para dividir gastos com
 El nombre viene del griego *nómos* (la norma que reparte). Wisenomy mantiene las cuentas sabias para que la conversación siga siendo amable.
 
 ![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777BB4)
-![SQLite](https://img.shields.io/badge/DB-SQLite-003B57)
+![SQLite / PostgreSQL](https://img.shields.io/badge/DB-SQLite%20%2F%20PostgreSQL-003B57)
 ![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-yellow.svg)
 ![Sin dependencias](https://img.shields.io/badge/dependencias-ninguna-success)
+
+🚀 **Demo en vivo:** [wisenomy.app](https://wisenomy.app)
 
 ---
 
@@ -108,13 +110,25 @@ Wisenomy funciona sin configuración. Puede que quieras ajustar:
 
 ---
 
+## Despliegue
+
+La instancia oficial en [wisenomy.app](https://wisenomy.app) corre sobre:
+
+- **App + PostgreSQL**: [Railway](https://railway.com) (~$5/mes).
+- **Emails**: [Resend](https://resend.com) (plan gratis: 3.000/mes).
+- **DNS, HTTPS, CDN, WAF**: [Cloudflare](https://cloudflare.com) (gratis).
+
+Para autoalojarla, copia `.env.example` a `.env`, rellena los valores y
+despliega en cualquier host con PHP 8.1+. La app detecta PostgreSQL
+automáticamente cuando `DATABASE_URL` está definida; si no, usa SQLite.
+
 ## Roadmap
 
-- [ ] SMTP real para recuperación de contraseña (actualmente escribe en un archivo de log).
-- [ ] Verificación de email en el registro.
-- [ ] Adaptador PostgreSQL para despliegues alojados.
-- [ ] Despliegue de un clic en Railway / Fly.io.
+- [ ] Autenticación en dos pasos (TOTP).
 - [ ] UI multilenguaje (actualmente solo español).
+- [ ] Backups automáticos de PostgreSQL a S3/R2.
+- [ ] App móvil nativa (la web ya es responsive).
+- [ ] Exportación del feed de actividad a PDF.
 
 ---
 

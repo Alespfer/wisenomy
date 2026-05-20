@@ -3,6 +3,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/lib/config.php';
 
+// Short-circuit /favicon.ico requests (browsers ask for it implicitly).
+// Modern clients use favicon.svg via the <link> tag in the layout.
+if (($_SERVER['REQUEST_URI'] ?? '') === '/favicon.ico') {
+    http_response_code(204);
+    exit;
+}
+
 // ── PRODUCTION HARDENING ───────────────────────────────────────────────────
 if (is_production()) {
     ini_set('display_errors', '0');

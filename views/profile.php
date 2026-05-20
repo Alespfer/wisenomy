@@ -85,8 +85,8 @@ ob_start();
         <div class="alert alert-warning small">
             <i class="bi bi-info-circle"></i>
             Los miembros de los grupos que has creado también perderán el acceso a esos grupos.
-            Si quieres preservarlos, traspasa la propiedad antes de eliminar tu cuenta
-            (función no disponible aún — escribe a <a href="mailto:privacidad@wisenomy.com">privacidad@wisenomy.com</a> si la necesitas).
+            Si quieres preservarlos, traspasa la propiedad a otro miembro antes de eliminar tu cuenta
+            desde la configuración del grupo.
         </div>
         <?php endif ?>
 
