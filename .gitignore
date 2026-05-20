@@ -1,0 +1,29 @@
+# Datos de la instancia local — contienen información personal real.
+# NUNCA versionar.
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Logs
+*.log
+
+# Variables de entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# Dependencias (por si en el futuro se añade Composer)
+vendor/
+node_modules/
