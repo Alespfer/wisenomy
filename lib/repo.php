@@ -156,7 +156,7 @@ function stats_by_payer(int $group_id, array $filters = []): array {
 function stats_by_month(int $group_id, array $filters = []): array {
     $d = stats_date_clause($filters);
     $s = db()->prepare(
-        "SELECT substr(occurred_at, 1, 7) AS month,
+        "SELECT substr(CAST(occurred_at AS TEXT), 1, 7) AS month,
                 COUNT(*) AS n,
                 SUM(amount_base_cents) AS total_cents
          FROM transactions

@@ -259,8 +259,8 @@ if ($action === 'group_create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $cur  = post('base_currency', 'EUR');
     if ($name === '') { $error = 'El nombre es obligatorio.'; goto group_new_view; }
     $new_id = group_create($name, $cur, $me_id);
-    activity_log($new_id, $me_id, $me['name'], 'group_create', "Creó el grupo «$name»");
-    flash('success', "Grupo «$name» creado.");
+    activity_log($new_id, $me_id, $me['name'], 'group_create', "Creó el grupo «{$name}»");
+    flash('success', "Grupo «{$name}» creado.");
     redirect("?action=group_edit&id=$new_id");
 }
 
@@ -272,8 +272,8 @@ if ($action === 'group_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $pname = post('new_participant');
         if ($pname !== '') {
             participant_create($id, $pname);
-            activity_log($id, $me_id, $me['name'], 'participant_create', "Añadió participante «$pname»");
-            flash('success', "Participante «$pname» añadido.");
+            activity_log($id, $me_id, $me['name'], 'participant_create', "Añadió participante «{$pname}»");
+            flash('success', "Participante «{$pname}» añadido.");
         } else {
             flash('warning', 'El nombre del participante no puede estar vacío.');
         }
@@ -442,8 +442,8 @@ if ($action === 'participant_create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect("?action=group_edit&id=$gid");
     }
     participant_create($gid, $name);
-    activity_log($gid, $me_id, $me['name'], 'participant_create', "Añadió participante «$name»");
-    flash('success', "Participante «$name» creado.");
+    activity_log($gid, $me_id, $me['name'], 'participant_create', "Añadió participante «{$name}»");
+    flash('success', "Participante «{$name}» creado.");
     redirect("?action=group_edit&id=$gid");
 }
 
@@ -454,7 +454,7 @@ if ($action === 'participant_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = post('name');
     if ($name !== '') {
         participant_update($id, $name);
-        activity_log((int)$p['group_id'], $me_id, $me['name'], 'participant_update', "Renombró participante «{$p['name']}» → «$name»");
+        activity_log((int)$p['group_id'], $me_id, $me['name'], 'participant_update', "Renombró participante «{$p['name']}» → «{$name}»");
         flash('success', 'Participante actualizado.');
     } else {
         flash('warning', 'El nombre no puede estar vacío.');

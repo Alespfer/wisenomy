@@ -45,7 +45,7 @@ function mail_send(string $to, string $subject, string $html, string $text): arr
     $resp = curl_exec($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $err  = curl_error($ch);
-    curl_close($ch);
+    // curl_close() is a no-op since PHP 8.0 and deprecated in 8.5
 
     if ($code >= 200 && $code < 300) return ['ok' => true];
     error_log("mail_send failed (HTTP $code): $err | $resp");
