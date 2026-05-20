@@ -12,7 +12,22 @@ ob_start();
             <p class="text-muted">Inicia sesión para gestionar tus gastos compartidos</p>
         </div>
 
-        <?php if (!empty($error)): ?>
+        <?php if (!empty($unverified)): ?>
+        <div class="alert alert-warning" role="alert">
+            <h6 class="alert-heading"><i class="bi bi-envelope-exclamation"></i> Email no verificado</h6>
+            <p class="small mb-2">
+                Necesitas confirmar tu dirección de correo antes de poder iniciar sesión.
+                Revisa tu bandeja (y la carpeta de spam) o solicita un nuevo enlace:
+            </p>
+            <form method="post" action="?action=resend_verification" class="d-flex gap-2">
+                <?= csrf_field() ?>
+                <input type="hidden" name="email" value="<?= htmlspecialchars($email ?? '') ?>">
+                <button type="submit" class="btn btn-sm btn-warning">
+                    <i class="bi bi-envelope"></i> Reenviar email de verificación
+                </button>
+            </form>
+        </div>
+        <?php elseif (!empty($error)): ?>
         <div class="alert alert-danger d-flex align-items-center" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($error) ?>
         </div>

@@ -12,6 +12,21 @@ ob_start();
             <p class="text-muted">Crea tu cuenta para empezar</p>
         </div>
 
+        <?php if (!empty($verification_sent)): ?>
+        <div class="alert alert-success" role="alert">
+            <h5 class="alert-heading"><i class="bi bi-envelope-check"></i> ¡Casi listo!</h5>
+            <p class="mb-2">
+                Te hemos enviado un email a
+                <strong><?= htmlspecialchars($sent_email) ?></strong>
+                con un enlace para verificar tu cuenta.
+            </p>
+            <p class="mb-0 small">
+                Revisa también la carpeta de spam. El enlace caduca en 48 horas.
+                <a href="?action=login" class="alert-link">Ir al inicio de sesión</a>.
+            </p>
+        </div>
+        <?php else: ?>
+
         <?php if (!empty($error)): ?>
         <div class="alert alert-danger d-flex align-items-center" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($error) ?>
@@ -56,6 +71,7 @@ ob_start();
         <p class="text-center mt-3 small text-muted">
             ¿Ya tienes cuenta? <a href="?action=login" class="fw-semibold">Iniciar sesión</a>
         </p>
+        <?php endif ?>
     </div>
 </div>
 <style>

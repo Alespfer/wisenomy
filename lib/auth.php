@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/mail.php';
 
 // Returns null if password meets the policy, otherwise an error message.
 // Policy: >=8 chars, at least 1 lowercase, 1 uppercase, 1 digit, 1 special.
@@ -38,19 +40,19 @@ function user_register(string $email, string $password, string $name): array {
     db()->prepare('INSERT INTO users(email, password_hash, name) VALUES(?,?,?)')
         ->execute([$email, $hash, $name]);
 
-    return ['user_id' => (int)db()->lastInsertId()];
+    return ['user_id' => last_insert_id('users')];
 }
 
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MIN   = 15;
 
 function login_attempts_recent(string $email, string $ip): int {
-    $win = LOGIN_WINDOW_MIN;
+    $threshold = sql_now_minus(LOGIN_WINDOW_MIN, 'minutes');
     $s = db()->prepare(
-        "SELECT COUNT(*) c FROM login_attempts
+        "SELECT COUNT(*) AS c FROM login_attempts
          WHERE success = 0
            AND (email = ? OR ip = ?)
-           AND attempted_at >= datetime('now', '-{$win} minutes')"
+           AND attempted_at >= $threshold"
     );
     $s->execute([$email, $ip]);
     return (int)$s->fetch()['c'];
@@ -60,10 +62,16 @@ function login_attempt_log(string $email, string $ip, bool $success): void {
     db()->prepare('INSERT INTO login_attempts(email, ip, success) VALUES(?,?,?)')
         ->execute([$email, $ip, $success ? 1 : 0]);
     // Prune old rows opportunistically (keep DB small)
-    db()->exec("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-1 day')");
+    $threshold = sql_now_minus(1, 'days');
+    db()->exec("DELETE FROM login_attempts WHERE attempted_at < $threshold");
 }
 
 function client_ip(): string {
+    // Trust X-Forwarded-For only when running behind a known proxy (Cloudflare/Railway).
+    if (trust_proxy() && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        return trim($ips[0]);
+    }
     return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 
@@ -75,13 +83,21 @@ function user_login(string $email, string $password): array {
         return ['error' => 'Demasiados intentos. Espera ' . LOGIN_WINDOW_MIN . ' minutos.'];
     }
 
-    $s = db()->prepare('SELECT id, password_hash FROM users WHERE email = ?');
+    $s = db()->prepare('SELECT id, password_hash, email_verified_at FROM users WHERE email = ?');
     $s->execute([$email]);
     $u = $s->fetch();
 
     if (!$u || !password_verify($password, $u['password_hash'])) {
         login_attempt_log($email, $ip, false);
         return ['error' => 'Credenciales incorrectas.'];
+    }
+
+    if (env_bool('REQUIRE_EMAIL_VERIFICATION', true) && empty($u['email_verified_at'])) {
+        login_attempt_log($email, $ip, false);
+        return [
+            'error'           => 'Tu email no está verificado. Revisa tu bandeja de entrada o solicita un nuevo enlace.',
+            'unverified_user' => (int)$u['id'],
+        ];
     }
 
     login_attempt_log($email, $ip, true);
@@ -181,13 +197,15 @@ function password_reset_create(string $email): ?string {
         ->execute([$token, (int)$u['id'], $expires]);
 
     // Prune old expired tokens
-    db()->exec("DELETE FROM password_resets WHERE expires_at < datetime('now')");
+    $now = sql_now();
+    db()->exec("DELETE FROM password_resets WHERE expires_at < $now");
 
     return $token;
 }
 
 function password_reset_get_user(string $token): ?int {
-    $s = db()->prepare("SELECT user_id FROM password_resets WHERE token = ? AND expires_at > datetime('now')");
+    $now = sql_now();
+    $s = db()->prepare("SELECT user_id FROM password_resets WHERE token = ? AND expires_at > $now");
     $s->execute([$token]);
     $r = $s->fetch();
     return $r ? (int)$r['user_id'] : null;
@@ -206,13 +224,88 @@ function password_reset_consume(string $token, string $new_password): array {
     return ['user_id' => $uid];
 }
 
-// Records the reset link to a file for now. In production, replace with SMTP send.
-// Timestamp uses ISO-8601 with offset so UTC vs local timezone is unambiguous.
+// Delivers the reset link. Uses Resend when configured, otherwise falls back to a local log.
 function password_reset_deliver(string $email, string $token, string $base_url): void {
     $link = $base_url . '?action=reset&token=' . $token;
-    $log  = __DIR__ . '/../data/password_resets.log';
-    $line = date('c') . " | $email | $link\n"; // e.g. 2026-05-20T13:01:50+00:00
-    file_put_contents($log, $line, FILE_APPEND | LOCK_EX);
+    $safe_link = htmlspecialchars($link, ENT_QUOTES);
+
+    $html_body = '<p>Has solicitado restablecer la contraseña de tu cuenta de Wisenomy.</p>'
+        . '<p><a href="' . $safe_link . '" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Restablecer contraseña</a></p>'
+        . '<p style="color:#6b7280;font-size:13px;">O copia y pega este enlace en tu navegador:<br><span style="word-break:break-all;">' . $safe_link . '</span></p>'
+        . '<p style="color:#6b7280;font-size:13px;">El enlace caduca en ' . RESET_TTL_HOURS . ' hora(s). Si no fuiste tú, ignora este mensaje.</p>';
+
+    $text_body = "Restablece tu contraseña de Wisenomy:\n\n$link\n\nEl enlace caduca en " . RESET_TTL_HOURS . " hora(s). Si no fuiste tú, ignora este mensaje.\n";
+
+    mail_send($email, 'Restablece tu contraseña de Wisenomy', mail_render_layout('Restablece tu contraseña', $html_body), $text_body);
+
+    // Also keep a local log entry as audit trail in dev environments.
+    if (!is_production()) {
+        $log = __DIR__ . '/../data/password_resets.log';
+        @mkdir(dirname($log), 0755, true);
+        file_put_contents($log, date('c') . " | $email | $link\n", FILE_APPEND | LOCK_EX);
+    }
+}
+
+// --- Email verification ---
+
+const EMAIL_VERIFICATION_TTL_HOURS = 48;
+
+function email_verification_create(int $user_id): string {
+    // Invalidate previous tokens for this user
+    db()->prepare('DELETE FROM email_verifications WHERE user_id = ?')->execute([$user_id]);
+
+    $token   = bin2hex(random_bytes(32));
+    $expires = date('Y-m-d H:i:s', time() + EMAIL_VERIFICATION_TTL_HOURS * 3600);
+    db()->prepare('INSERT INTO email_verifications(token, user_id, expires_at) VALUES(?,?,?)')
+        ->execute([$token, $user_id, $expires]);
+
+    // Prune expired tokens opportunistically
+    $now = sql_now();
+    db()->exec("DELETE FROM email_verifications WHERE expires_at < $now");
+
+    return $token;
+}
+
+function email_verification_send(int $user_id, string $email, string $base_url): void {
+    $token = email_verification_create($user_id);
+    $link  = $base_url . '?action=verify&token=' . $token;
+    $safe_link = htmlspecialchars($link, ENT_QUOTES);
+
+    $html_body = '<p>¡Bienvenido/a a Wisenomy!</p>'
+        . '<p>Para activar tu cuenta, confirma que este es tu correo electrónico haciendo clic en el botón:</p>'
+        . '<p><a href="' . $safe_link . '" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Verificar mi email</a></p>'
+        . '<p style="color:#6b7280;font-size:13px;">O copia y pega este enlace:<br><span style="word-break:break-all;">' . $safe_link . '</span></p>'
+        . '<p style="color:#6b7280;font-size:13px;">El enlace caduca en ' . EMAIL_VERIFICATION_TTL_HOURS . ' horas.</p>';
+
+    $text_body = "¡Bienvenido/a a Wisenomy!\n\nPara activar tu cuenta, verifica tu email:\n$link\n\nCaduca en " . EMAIL_VERIFICATION_TTL_HOURS . " horas.\n";
+
+    mail_send($email, 'Verifica tu email de Wisenomy', mail_render_layout('Verifica tu email', $html_body), $text_body);
+}
+
+// Returns user_id if the token is valid and not expired, otherwise null.
+function email_verification_get_user(string $token): ?int {
+    $now = sql_now();
+    $s = db()->prepare("SELECT user_id FROM email_verifications WHERE token = ? AND expires_at > $now");
+    $s->execute([$token]);
+    $r = $s->fetch();
+    return $r ? (int)$r['user_id'] : null;
+}
+
+// Marks the user as verified and deletes the token. Returns null on success, error string otherwise.
+function email_verification_consume(string $token): ?int {
+    $uid = email_verification_get_user($token);
+    if ($uid === null) return null;
+    $now = sql_now();
+    db()->prepare("UPDATE users SET email_verified_at = $now WHERE id = ?")->execute([$uid]);
+    db()->prepare('DELETE FROM email_verifications WHERE token = ?')->execute([$token]);
+    return $uid;
+}
+
+function user_email_is_verified(int $user_id): bool {
+    $s = db()->prepare('SELECT email_verified_at FROM users WHERE id = ?');
+    $s->execute([$user_id]);
+    $r = $s->fetch();
+    return $r && !empty($r['email_verified_at']);
 }
 
 // --- CSRF ---

@@ -1,6 +1,18 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/lib/config.php';
+
+// ── PRODUCTION HARDENING ───────────────────────────────────────────────────
+if (is_production()) {
+    ini_set('display_errors', '0');
+    ini_set('display_startup_errors', '0');
+    ini_set('log_errors', '1');
+} else {
+    ini_set('display_errors', '1');
+}
+error_reporting(E_ALL);
+
 // ── SECURITY HEADERS ────────────────────────────────────────────────────────
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
@@ -17,7 +29,7 @@ header(
     . "base-uri 'self'; "
     . "frame-ancestors 'none'"
 );
-if (!empty($_SERVER['HTTPS'])) {
+if (request_is_https()) {
     header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 }
 
@@ -26,7 +38,7 @@ session_set_cookie_params([
     'lifetime' => 0,
     'path'     => '/',
     'domain'   => '',
-    'secure'   => !empty($_SERVER['HTTPS']),
+    'secure'   => request_is_https(),
     'httponly' => true,
     'samesite' => 'Lax',
 ]);
@@ -93,16 +105,42 @@ if ($action === 'terms')   { require __DIR__ . '/views/terms.php';   exit; }
 
 if ($action === 'register') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $r = user_register(post('email'), $_POST['password'] ?? '', post('name'));
+        $email = post('email');
+        $r = user_register($email, $_POST['password'] ?? '', post('name'));
         if (isset($r['error'])) {
-            $error = $r['error']; $email = post('email'); $name = post('name');
+            $error = $r['error']; $name = post('name');
             require __DIR__ . '/views/register.php'; exit;
         }
-        user_login(post('email'), $_POST['password'] ?? '');
-        flash('success', '¡Bienvenido/a a Wisenomy!');
-        redirect(!empty($_SESSION['pending_invite']) ? '?action=invite_accept' : '?');
+        // Send verification email (uses Resend in prod, log file in dev)
+        email_verification_send((int)$r['user_id'], strtolower(trim($email)), base_url());
+        $verification_sent = true;
+        $sent_email        = $email;
+        require __DIR__ . '/views/register.php'; exit;
     }
     require __DIR__ . '/views/register.php'; exit;
+}
+
+// Email verification landing
+if ($action === 'verify') {
+    $token = (string)($_REQUEST['token'] ?? '');
+    $uid   = $token !== '' ? email_verification_consume($token) : null;
+    $verify_ok = $uid !== null;
+    require __DIR__ . '/views/verify_email.php'; exit;
+}
+
+// Re-send verification email
+if ($action === 'resend_verification' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = strtolower(trim(post('email')));
+    if ($email !== '') {
+        $s = db()->prepare('SELECT id, email_verified_at FROM users WHERE email = ?');
+        $s->execute([$email]);
+        $u = $s->fetch();
+        if ($u && empty($u['email_verified_at'])) {
+            email_verification_send((int)$u['id'], $email, base_url());
+        }
+    }
+    flash('success', 'Si el email existe y aún no está verificado, te hemos enviado un nuevo enlace.');
+    redirect('?action=login');
 }
 
 if ($action === 'login') {
@@ -110,6 +148,7 @@ if ($action === 'login') {
         $r = user_login(post('email'), $_POST['password'] ?? '');
         if (isset($r['error'])) {
             $error = $r['error']; $email = post('email');
+            $unverified = !empty($r['unverified_user']);
             require __DIR__ . '/views/login.php'; exit;
         }
         flash('success', 'Sesión iniciada.');
@@ -127,11 +166,7 @@ if ($action === 'forgot') {
         $token = password_reset_create($email);
         // Always show same message regardless of whether email exists (anti-enumeration)
         if ($token !== null) {
-            $scheme = !empty($_SERVER['HTTPS']) ? 'https' : 'http';
-            $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $path   = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/');
-            $base   = $scheme . '://' . $host . $path . '/';
-            password_reset_deliver($email, $token, $base);
+            password_reset_deliver($email, $token, base_url());
         }
         $sent = true;
         require __DIR__ . '/views/forgot.php'; exit;

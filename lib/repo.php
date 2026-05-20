@@ -44,7 +44,7 @@ function group_create(string $name, string $currency, int $user_id): int {
     try {
         $db->prepare('INSERT INTO groups(name, base_currency, owner_user_id) VALUES(?,?,?)')
            ->execute([trim($name), strtoupper($currency), $user_id]);
-        $gid = (int)$db->lastInsertId();
+        $gid = last_insert_id('groups');
         $db->prepare('INSERT INTO group_members(group_id, user_id, role) VALUES(?,?,?)')
            ->execute([$gid, $user_id, 'owner']);
         $db->commit();
@@ -99,8 +99,8 @@ function stats_date_clause(array $filters): array {
         $params[] = $filters['date_from'];
     }
     if (!empty($filters['date_to'])) {
-        $sql .= " AND occurred_at <= ? || ' 23:59:59'";
-        $params[] = $filters['date_to'];
+        $sql .= ' AND occurred_at <= ?';
+        $params[] = $filters['date_to'] . ' 23:59:59';
     }
     return ['sql' => $sql, 'params' => $params];
 }
@@ -216,7 +216,7 @@ function participant_get(int $id): array|false {
 function participant_create(int $group_id, string $name): int {
     $s = db()->prepare('INSERT INTO participants(group_id,name) VALUES(?,?)');
     $s->execute([$group_id, trim($name)]);
-    return (int)db()->lastInsertId();
+    return last_insert_id('participants');
 }
 
 function participant_update(int $id, string $name): void {
@@ -256,8 +256,8 @@ function tx_list(int $group_id, array $filters = []): array {
         $params[] = $filters['date_from'];
     }
     if (!empty($filters['date_to'])) {
-        $sql .= " AND t.occurred_at <= ? || ' 23:59:59'";
-        $params[] = $filters['date_to'];
+        $sql .= ' AND t.occurred_at <= ?';
+        $params[] = $filters['date_to'] . ' 23:59:59';
     }
 
     if ($sort !== null) {
@@ -319,7 +319,7 @@ function tx_create(array $d): int {
             $d['note'] ?? '',
             $d['occurred_at'] ?? date('Y-m-d H:i:s'),
         ]);
-        $tx_id = (int)$db->lastInsertId();
+        $tx_id = last_insert_id('transactions');
 
         tx_insert_shares($db, $tx_id, $d, $fx['cents']);
 

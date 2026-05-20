@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/config.php';
 
 const INVITE_TTL_DAYS_DEFAULT = 7;
 
@@ -80,7 +81,12 @@ function invite_is_active(array $inv): bool {
 }
 
 function base_url(): string {
-    $scheme = !empty($_SERVER['HTTPS']) ? 'https' : 'http';
+    // Honour APP_URL when set (production) so links in emails use the canonical domain.
+    $configured = env('APP_URL');
+    if ($configured !== null && $configured !== '') {
+        return rtrim($configured, '/') . '/';
+    }
+    $scheme = request_scheme();
     $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $path   = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/');
     return $scheme . '://' . $host . $path . '/';
