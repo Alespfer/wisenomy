@@ -26,7 +26,7 @@ Modern web apps demand a lot — npm install, transpilers, ORMs, three layers of
 - **Single language end to end.** PHP for routing, persistence, templating. No context switching, no JS framework.
 - **Two days to fork it confidently.** ~3.500 LoC total. Any PHP developer can audit the security, understand the data model, and ship a custom feature without reading docs.
 - **Hostable for €14/year.** Cloudflare DNS (free) + Railway PHP+Postgres ($5/month) + Resend transactional emails (3.000/month free) + your dominio.
-- **Boring, durable choices.** SQLite for development, PostgreSQL for production, raw SQL via PDO, server-rendered HTML, Bootstrap from CDN. Tech that will still work in 2036.
+- **Durable choices.** SQLite for development, PostgreSQL for production, raw SQL via PDO, server-rendered HTML, Bootstrap from CDN. Tech that will still work in 2036.
 
 It's not the answer for every project. It is the answer when you want to *own* the stack instead of borrow it.
 
