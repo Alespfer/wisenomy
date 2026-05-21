@@ -1,0 +1,48 @@
+# Self-host Wisenomy with PostgreSQL persistence.
+#
+# Quick start:
+#   docker compose up -d
+#   open http://localhost:8080
+#
+# Stop:
+#   docker compose down          # keeps data
+#   docker compose down -v       # deletes the database volume too
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgres://wisenomy:wisenomy@db:5432/wisenomy?sslmode=disable
+      # Email delivery falls back to data/mail.log when RESEND_API_KEY is not set.
+      # Uncomment and fill if you want real outbound email:
+      # RESEND_API_KEY: re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      # MAIL_FROM: noreply@example.com
+      # APP_URL: https://wisenomy.example.com
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/data
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wisenomy
+      POSTGRES_USER: wisenomy
+      POSTGRES_PASSWORD: wisenomy
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wisenomy"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  app_data:
+  pg_data:
