@@ -10,9 +10,10 @@ function fmt(int $cents, string $currency = ''): string {
 // Cycle sort state: not-set → asc → desc → not-set
 function sort_url(string $col, array $f, int $gid): string {
     $params = ['g' => $gid];
-    foreach (['payer','date_from','date_to'] as $k) {
+    foreach (['payer','date_from','date_to','category','type'] as $k) {
         if (!empty($f[$k])) $params[$k] = $f[$k];
     }
+    // page is intentionally NOT preserved → resets to 1 when sorting
     $cur_sort = $f['sort'] ?? '';
     $cur_dir  = $f['dir']  ?? '';
     if ($cur_sort === $col) {
@@ -22,6 +23,16 @@ function sort_url(string $col, array $f, int $gid): string {
         $params['sort'] = $col;
         $params['dir']  = 'asc';
     }
+    return '?' . http_build_query($params);
+}
+
+// Builds a paginator URL that preserves all current filters + sort.
+function tx_pg_url(int $gid, array $f, int $page): string {
+    $params = ['g' => $gid];
+    foreach (['payer','date_from','date_to','category','type','sort','dir'] as $k) {
+        if (!empty($f[$k])) $params[$k] = $f[$k];
+    }
+    if ($page > 1) $params['page'] = $page;
     return '?' . http_build_query($params);
 }
 
@@ -62,7 +73,8 @@ $type_icons = [
     'settlement'     => 'bi-arrow-left-right',
 ];
 
-$has_filters = !empty($filters['payer']) || !empty($filters['date_from']) || !empty($filters['date_to']);
+$has_filters = !empty($filters['payer']) || !empty($filters['date_from']) || !empty($filters['date_to'])
+            || !empty($filters['category']) || !empty($filters['type']);
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
@@ -72,7 +84,7 @@ $has_filters = !empty($filters['payer']) || !empty($filters['date_from']) || !em
         </h2>
         <p class="text-muted small mb-0">
             <i class="bi bi-people"></i> <?= count($participants) ?> participantes ·
-            <i class="bi bi-receipt"></i> <?= count($transactions) ?> transacciones
+            <i class="bi bi-receipt"></i> <?= (int)$total ?> transacciones
         </p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
@@ -178,23 +190,44 @@ $has_filters = !empty($filters['payer']) || !empty($filters['date_from']) || !em
                 <input type="hidden" name="dir"  value="<?= htmlspecialchars($filters['dir']) ?>">
             <?php endif ?>
 
-            <div class="col-md-4">
+            <div class="col-lg-2 col-md-4 col-sm-6">
                 <label class="form-label small text-muted mb-1">Pagador</label>
                 <input type="text" name="payer" class="form-control form-control-sm"
-                       placeholder="Filtrar por pagador"
+                       placeholder="Buscar..."
                        value="<?= htmlspecialchars($filters['payer'] ?? '') ?>">
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="form-label small text-muted mb-1">Categoría</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">— todas —</option>
+                    <option value="__none__" <?= ($filters['category'] ?? '') === '__none__' ? 'selected' : '' ?>>(sin categoría)</option>
+                    <?php foreach ($categories as $cat): ?>
+                        <option value="<?= htmlspecialchars($cat) ?>" <?= ($filters['category'] ?? '') === $cat ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($cat) ?>
+                        </option>
+                    <?php endforeach ?>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <label class="form-label small text-muted mb-1">Tipo</label>
+                <select name="type" class="form-select form-select-sm">
+                    <option value="">— todos —</option>
+                    <?php foreach ($type_labels as $code => $label): ?>
+                        <option value="<?= $code ?>" <?= ($filters['type'] ?? '') === $code ? 'selected' : '' ?>><?= $label ?></option>
+                    <?php endforeach ?>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
                 <label class="form-label small text-muted mb-1">Desde</label>
                 <input type="date" name="date_from" class="form-control form-control-sm"
                        value="<?= htmlspecialchars($filters['date_from'] ?? '') ?>">
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-2 col-md-4 col-sm-6">
                 <label class="form-label small text-muted mb-1">Hasta</label>
                 <input type="date" name="date_to" class="form-control form-control-sm"
                        value="<?= htmlspecialchars($filters['date_to'] ?? '') ?>">
             </div>
-            <div class="col-md-2 d-flex gap-1">
+            <div class="col-lg-2 col-md-4 col-sm-6 d-flex gap-1">
                 <button type="submit" class="btn btn-sm btn-brand flex-fill">
                     <i class="bi bi-search"></i> Buscar
                 </button>
@@ -207,7 +240,7 @@ $has_filters = !empty($filters['payer']) || !empty($filters['date_from']) || !em
         </form>
         <?php if ($has_filters): ?>
         <div class="small text-muted mt-2">
-            <i class="bi bi-funnel-fill"></i> Mostrando <?= count($transactions) ?> resultados con filtros activos
+            <i class="bi bi-funnel-fill"></i> <?= (int)$total ?> resultado<?= $total === 1 ? '' : 's' ?> con filtros activos
         </div>
         <?php endif ?>
     </div>
@@ -325,6 +358,40 @@ $has_filters = !empty($filters['payer']) || !empty($filters['date_from']) || !em
         </tbody>
     </table>
     </div>
+
+    <?php if ($pages > 1):
+        $first = ($page - 1) * $per_page + 1;
+        $last  = min($total, $page * $per_page);
+        $start = max(1, $page - 2);
+        $end   = min($pages, $page + 2);
+    ?>
+    <nav class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 border-top">
+        <span class="small text-muted">
+            Mostrando <?= $first ?>–<?= $last ?> de <?= $total ?>
+        </span>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= tx_pg_url($group['id'], $filters, max(1, $page - 1)) ?>">&laquo;</a>
+            </li>
+            <?php if ($start > 1): ?>
+                <li class="page-item"><a class="page-link" href="<?= tx_pg_url($group['id'], $filters, 1) ?>">1</a></li>
+                <?php if ($start > 2): ?><li class="page-item disabled"><span class="page-link">…</span></li><?php endif ?>
+            <?php endif ?>
+            <?php for ($p = $start; $p <= $end; $p++): ?>
+                <li class="page-item <?= $p === $page ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= tx_pg_url($group['id'], $filters, $p) ?>"><?= $p ?></a>
+                </li>
+            <?php endfor ?>
+            <?php if ($end < $pages): ?>
+                <?php if ($end < $pages - 1): ?><li class="page-item disabled"><span class="page-link">…</span></li><?php endif ?>
+                <li class="page-item"><a class="page-link" href="<?= tx_pg_url($group['id'], $filters, $pages) ?>"><?= $pages ?></a></li>
+            <?php endif ?>
+            <li class="page-item <?= $page >= $pages ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= tx_pg_url($group['id'], $filters, min($pages, $page + 1)) ?>">&raquo;</a>
+            </li>
+        </ul>
+    </nav>
+    <?php endif ?>
     <?php endif ?>
 </div>
 <?php

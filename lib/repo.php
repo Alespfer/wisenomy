@@ -229,22 +229,13 @@ function participant_delete(int $id): void {
 
 // --- Transactions ---
 
-function tx_list(int $group_id, array $filters = []): array {
-    // Whitelist sortable columns (no user input reaches ORDER BY directly)
-    $sort_map = [
-        'occurred_at'       => 't.occurred_at',
-        'category'          => 't.category',
-        'amount_base_cents' => 't.amount_base_cents',
-        'payer'             => 'p.name',
-        'type'              => 't.type',
-    ];
-    $sort = $sort_map[$filters['sort'] ?? ''] ?? null;
-    $dir  = (($filters['dir'] ?? '') === 'asc') ? 'ASC' : 'DESC';
+const TX_PER_PAGE = 30;
+const TX_VALID_TYPES = ['expense_equal','expense_shares','expense_full','gift','settlement'];
 
-    $sql = 'SELECT t.*, p.name AS payer_name
-            FROM transactions t
-            JOIN participants p ON p.id = t.payer_participant_id
-            WHERE t.group_id = ?';
+// Builds the WHERE clause shared by tx_list and tx_count. Keeps the filter
+// logic in a single place to guarantee paginator and listing stay in sync.
+function tx_where_clause(int $group_id, array $filters): array {
+    $sql    = 'WHERE t.group_id = ?';
     $params = [$group_id];
 
     if (!empty($filters['payer'])) {
@@ -259,16 +250,73 @@ function tx_list(int $group_id, array $filters = []): array {
         $sql .= ' AND t.occurred_at <= ?';
         $params[] = $filters['date_to'] . ' 23:59:59';
     }
+    if (isset($filters['category']) && $filters['category'] !== '') {
+        // Sentinel "__none__" matches transactions with no category set
+        if ($filters['category'] === '__none__') {
+            $sql .= " AND t.category = ''";
+        } else {
+            $sql .= ' AND t.category = ?';
+            $params[] = $filters['category'];
+        }
+    }
+    if (!empty($filters['type']) && in_array($filters['type'], TX_VALID_TYPES, true)) {
+        $sql .= ' AND t.type = ?';
+        $params[] = $filters['type'];
+    }
+    return ['sql' => $sql, 'params' => $params];
+}
+
+function tx_list(int $group_id, array $filters = [], int $limit = 0, int $offset = 0): array {
+    // Whitelist sortable columns (no user input reaches ORDER BY directly)
+    $sort_map = [
+        'occurred_at'       => 't.occurred_at',
+        'category'          => 't.category',
+        'amount_base_cents' => 't.amount_base_cents',
+        'payer'             => 'p.name',
+        'type'              => 't.type',
+    ];
+    $sort = $sort_map[$filters['sort'] ?? ''] ?? null;
+    $dir  = (($filters['dir'] ?? '') === 'asc') ? 'ASC' : 'DESC';
+
+    $w   = tx_where_clause($group_id, $filters);
+    $sql = 'SELECT t.*, p.name AS payer_name
+            FROM transactions t
+            JOIN participants p ON p.id = t.payer_participant_id
+            ' . $w['sql'];
 
     if ($sort !== null) {
         $sql .= " ORDER BY $sort $dir, t.id DESC";
     } else {
         $sql .= ' ORDER BY t.occurred_at DESC, t.id DESC';
     }
+    if ($limit > 0) {
+        $limit  = (int)$limit;
+        $offset = max(0, (int)$offset);
+        $sql .= " LIMIT $limit OFFSET $offset";
+    }
 
     $s = db()->prepare($sql);
-    $s->execute($params);
+    $s->execute($w['params']);
     return $s->fetchAll();
+}
+
+function tx_count(int $group_id, array $filters = []): int {
+    $w = tx_where_clause($group_id, $filters);
+    $s = db()->prepare(
+        'SELECT COUNT(*) AS c
+         FROM transactions t
+         JOIN participants p ON p.id = t.payer_participant_id
+         ' . $w['sql']
+    );
+    $s->execute($w['params']);
+    return (int)$s->fetch()['c'];
+}
+
+// Distinct non-empty categories used in the group, alphabetically.
+function categories_in_group(int $group_id): array {
+    $s = db()->prepare("SELECT DISTINCT category FROM transactions WHERE group_id = ? AND category <> '' ORDER BY category");
+    $s->execute([$group_id]);
+    return array_column($s->fetchAll(), 'category');
 }
 
 function tx_get(int $id): array|false {

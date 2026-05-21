@@ -634,8 +634,16 @@ if ($gid > 0) {
         'payer'     => trim((string)($_GET['payer']     ?? '')),
         'date_from' => trim((string)($_GET['date_from'] ?? '')),
         'date_to'   => trim((string)($_GET['date_to']   ?? '')),
+        'category'  => trim((string)($_GET['category']  ?? '')),
+        'type'      => trim((string)($_GET['type']      ?? '')),
     ];
-    $transactions = tx_list($gid, $filters);
+    $per_page     = TX_PER_PAGE;
+    $page         = max(1, (int)($_GET['page'] ?? 1));
+    $total        = tx_count($gid, $filters);
+    $pages        = max(1, (int)ceil($total / $per_page));
+    if ($page > $pages) $page = $pages;
+    $transactions = tx_list($gid, $filters, $per_page, ($page - 1) * $per_page);
+    $categories   = categories_in_group($gid);
     $settlement   = compute_settlement($gid);
     require __DIR__ . '/views/group_detail.php';
     exit;
