@@ -26,7 +26,7 @@ Las apps web modernas piden mucho: `npm install`, transpiladores, ORMs, tres cap
 - **Un único lenguaje de extremo a extremo.** PHP para enrutado, persistencia y templates. Sin saltos de contexto, sin framework JS.
 - **Forkable en dos días con confianza.** ~3.500 líneas totales. Cualquier desarrollador PHP puede auditar la seguridad, entender el modelo de datos y enviar una feature personalizada sin leer documentación.
 - **Hospedable por 14 €/año.** Cloudflare DNS (gratis) + Railway PHP+Postgres ($5/mes) + Resend para email transaccional (3.000/mes gratis) + tu dominio.
-- **Decisiones aburridas y duraderas.** SQLite para desarrollo, PostgreSQL para producción, SQL crudo vía PDO, HTML renderizado en servidor, Bootstrap por CDN. Tecnología que seguirá funcionando en 2036.
+- **Decisiones duraderas.** SQLite para desarrollo, PostgreSQL para producción, SQL crudo vía PDO, HTML renderizado en servidor, Bootstrap por CDN. Tecnología que seguirá funcionando en 2036.
 
 No es la respuesta para todos los proyectos. Es la respuesta cuando quieres *poseer* el stack en lugar de tomarlo prestado.
 
