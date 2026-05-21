@@ -306,7 +306,7 @@ $has_filters = !empty($filters['payer']) || !empty($filters['date_from']) || !em
         <tbody>
         <?php foreach ($transactions as $tx): ?>
         <tr>
-            <td class="text-nowrap small text-muted"><?= htmlspecialchars(substr($tx['occurred_at'],0,10)) ?></td>
+            <td class="text-nowrap small text-muted"><?= fmt_date($tx['occurred_at']) ?></td>
             <td>
                 <span class="tx-type-badge tx-type-<?= $tx['type'] ?>">
                     <i class="bi <?= $type_icons[$tx['type']] ?? 'bi-circle' ?>"></i>

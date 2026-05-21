@@ -79,6 +79,12 @@ function redirect(string $url): never {
 function h(string $s): string {
     return htmlspecialchars($s, ENT_QUOTES);
 }
+// Spanish date format: YYYY-MM-DD → DD-MM-YYYY (accepts datetime strings; ignores time).
+function fmt_date(string $iso): string {
+    $d = substr($iso, 0, 10);
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $d, $m)) return $iso;
+    return $m[3] . '-' . $m[2] . '-' . $m[1];
+}
 function post(string $k, string $default = ''): string {
     return trim((string)($_POST[$k] ?? $default));
 }
