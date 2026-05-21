@@ -15,5 +15,7 @@ COPY . .
 RUN mkdir -p data && chown -R www-data:www-data data
 USER www-data
 
+# Shell form so ${PORT:-8080} is expanded at runtime.
+# Railway and similar PaaS inject PORT dynamically; falls back to 8080 in local docker run.
 EXPOSE 8080
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "."]
+CMD php -S 0.0.0.0:${PORT:-8080} -t .
