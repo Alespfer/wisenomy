@@ -302,8 +302,13 @@ if ($action === 'group_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($action === 'group_delete') {
     require_group_owner($me_id, $id);
     $g = group_get($id);
-    group_delete($id);
-    flash('success', "Grupo «" . ($g['name'] ?? '') . "» eliminado.");
+    try {
+        group_delete($id);
+        flash('success', "Grupo «" . ($g['name'] ?? '') . "» eliminado.");
+    } catch (Throwable $e) {
+        error_log('group_delete failed: ' . $e->getMessage());
+        flash('error', 'No se pudo eliminar el grupo. Inténtalo de nuevo o contacta con soporte si el problema persiste.');
+    }
     redirect('?');
 }
 

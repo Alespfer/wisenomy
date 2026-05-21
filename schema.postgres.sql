@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     type TEXT NOT NULL CHECK(type IN ('expense_equal','expense_shares','expense_full','gift','settlement')),
-    payer_participant_id INTEGER NOT NULL REFERENCES participants(id),
+    payer_participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
     amount_cents BIGINT NOT NULL,
     currency TEXT NOT NULL,
     amount_base_cents BIGINT NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS transaction_shares (
     id SERIAL PRIMARY KEY,
     transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
-    participant_id INTEGER NOT NULL REFERENCES participants(id),
+    participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
     share_cents BIGINT NOT NULL
 );
 

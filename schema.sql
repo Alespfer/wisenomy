@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     occurred_at TEXT NOT NULL DEFAULT (datetime('now')),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
-    FOREIGN KEY (payer_participant_id) REFERENCES participants(id)
+    FOREIGN KEY (payer_participant_id) REFERENCES participants(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS transaction_shares (
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS transaction_shares (
     participant_id INTEGER NOT NULL,
     share_cents INTEGER NOT NULL,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
-    FOREIGN KEY (participant_id) REFERENCES participants(id)
+    FOREIGN KEY (participant_id) REFERENCES participants(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS fx_cache (

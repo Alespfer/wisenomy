@@ -61,7 +61,21 @@ function group_update(int $id, string $name, string $currency): void {
 }
 
 function group_delete(int $id): void {
-    db()->prepare('DELETE FROM groups WHERE id=?')->execute([$id]);
+    $db = db();
+    $db->beginTransaction();
+    try {
+        $db->prepare('DELETE FROM transaction_shares WHERE transaction_id IN (SELECT id FROM transactions WHERE group_id=?)')->execute([$id]);
+        $db->prepare('DELETE FROM transactions  WHERE group_id=?')->execute([$id]);
+        $db->prepare('DELETE FROM participants  WHERE group_id=?')->execute([$id]);
+        $db->prepare('DELETE FROM group_invites WHERE group_id=?')->execute([$id]);
+        $db->prepare('DELETE FROM activity_log  WHERE group_id=?')->execute([$id]);
+        $db->prepare('DELETE FROM group_members WHERE group_id=?')->execute([$id]);
+        $db->prepare('DELETE FROM groups        WHERE id=?')->execute([$id]);
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
 }
 
 // Transfers ownership to another existing member. Returns null on success or error message.
