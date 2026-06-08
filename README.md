@@ -1,6 +1,6 @@
 # Wisenomy
 
-> 🌍 Read this in [Español](README.es.md)
+> 🌍 Read this in [Español](README.es.md) · [Français](README.fr.md)
 
 **A Splitwise alternative you can read in an afternoon.**
 No frameworks. No Composer. No Node. No build step. ~3.500 lines of PHP that do the whole job.
